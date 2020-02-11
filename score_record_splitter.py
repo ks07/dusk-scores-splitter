@@ -77,8 +77,18 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         sys.exit(1)
     records = split_scores(sys.argv[1])
+    recordbuff = bytearray()
     for raw in records:
+        if len(recordbuff) > 0:
+            raw = recordbuff + raw
         print(raw)
-        record = ScoreRecord(raw)
-        print(record)
+        try:
+            record = ScoreRecord(raw)
+            recordbuff = bytearray()
+            print(record)
+        except ValueError:
+            # Splitting on the supposed record start marker isn't quite right because there's nothing stopping it appearing in values
+            # If we fail, ensure the end marker is present (though of course this suffers the same problem, albeit less frequently)
+            recordbuff.extend(raw)
+            print("Trying to extend the buffer")
 #    display_records(records)
