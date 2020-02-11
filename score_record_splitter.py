@@ -16,7 +16,9 @@ class ScoreRecord:
         labelstart = False
         reststart = False
         label = ""
-        pfix = bytearray()
+        self.pfix = raw[0] # What is this first byte???
+        raw = raw[1:]
+        levelind = bytearray()
 
         for i, b in enumerate(raw):
             if not labelstart and chr(b).isalpha():
@@ -28,9 +30,9 @@ class ScoreRecord:
                 self.rest = raw[i:]
                 break
             else:
-                pfix.append(b)
+                levelind.append(b)
 
-        self.pfix = pfix
+        self.level = bytes(levelind)
         self.label = label
         # apparently the last 4 bytes are the business end???
         if label in ['seconds', 'minutes']:
@@ -45,7 +47,7 @@ class ScoreRecord:
             self.value = int.from_bytes(self.rest[-4:], byteorder='little')
 
     def __str__(self):
-        return "[" + str(self.pfix) + "] " + self.label + ": " + str(self.value) + " " + str(self.rest)
+        return "[" + str(self.level) + "] " + self.label + ": " + str(self.value) + " {" + str(self.pfix) + "} " + str(self.rest)
         
 
 def printerr(msg):
