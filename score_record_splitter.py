@@ -32,6 +32,10 @@ class ScoreRecord:
             else:
                 levelind.append(b)
 
+        labelTest = raw[0:self.pfix].decode()
+        if labelTest != label:
+            raise Exception(f"Piecemeal label '{label}' doesn't match expected sliced label '{labelTest}'");
+
         self.level = bytes(levelind)
         self.label = label
         # apparently the last 4 bytes are the business end???
