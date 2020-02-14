@@ -78,7 +78,7 @@ def display_records(records):
 def print_levels(levels):
     for l, records in levels.items():
         print(l)
-        for r in records:
+        for r in sorted(records, key=lambda x: x.label):
             print("\t" + str(r))
 
 if __name__ == '__main__':
