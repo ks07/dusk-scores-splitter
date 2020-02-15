@@ -3,7 +3,46 @@
 import struct
 import sys
 
+class Scores:
+    def __init__(self):
+        self.levels = {}
 
+    def add_record(self, record):
+        if record.level in self.levels:
+            self.levels[record.level].add_record(record)
+        else:
+            self.levels[record.level] = Level(record)
+
+    def __str__(self):
+        s = ""
+        for level in sorted(self.levels.values(), key=lambda x: int(x.id)):
+            s += "\n" + str(level)
+        return s
+
+class Level:
+    def __init__(self, record):
+        self.id     = record.level
+        self.scores = [ record ]
+        self.name   = None
+        if record.label == "name":
+            self.name = record.value
+
+    def add_record(self, record):
+        self.scores.append(record)
+        if record.label == "name":
+            if self.name is not None:
+                raise ValueError("tried to add multiple name records to Level")
+            self.name = record.value
+
+    def get_name(self):
+        return self.name if self.name is not None else "???"
+
+    def __str__(self):
+        disp_name = self.get_name()
+        s = f"{disp_name} [{self.id}]"
+        for r in sorted(self.scores, key=lambda r: r.label):
+            s += "\n\t" + str(r)
+        return s
 
 class ScoreRecord:
     def __init__(self, raw):
@@ -48,52 +87,23 @@ def split_scores(path):
         saves = infile.read()
         return saves.split(b'\x7e')[1:]
 
-def format_byte(b):
-    c = chr(b)
-    if c.isalpha():
-        return c
-    else:
-        return '%0.2x' % b
-
-def display_records(records):
-    for r in records:
-        stripped = r.rstrip(b'{')
-        if stripped == r:
-            printerr("Found a record without the record end byte?")
-        print(r)
-        for b in r:
-            print(format_byte(b), end="\t")
-        print()
-
-def print_levels(levels):
-    for l, records in sorted(levels.items(), key=lambda x: int(x[1][0].level)):
-        print(l)
-        for r in sorted(records, key=lambda x: x.label):
-            print("\t" + str(r))
-
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         sys.exit(1)
     records = split_scores(sys.argv[1])
     recordbuff = bytearray()
-    parsedRecords = []
+    scores = Scores()
     for raw in records:
         if len(recordbuff) > 0:
             raw = recordbuff + raw
-        print(raw)
         try:
             record = ScoreRecord(raw)
             recordbuff = bytearray()
-            print(record)
-            parsedRecords.append(record)
+            scores.add_record(record)
         except ValueError:
             # Splitting on the supposed record start marker isn't quite right because there's nothing stopping it appearing in values
             # If we fail, ensure the end marker is present (though of course this suffers the same problem, albeit less frequently)
             recordbuff.extend(raw)
-            print("Trying to extend the buffer")
+            printerr("Got truncated record, trying to extend the buffer...")
 
-    levels = {r.level: [] for r in parsedRecords}
-    for r in parsedRecords:
-        levels[r.level].append(r)
-
-    print_levels(levels)
+    print(scores)
