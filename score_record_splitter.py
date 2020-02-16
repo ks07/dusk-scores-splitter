@@ -28,9 +28,15 @@ class Scores:
         else:
             self.levels[record.level] = Level(record)
 
+    def __sorted_levels(self):
+        return sorted(self.levels.values(), key=lambda x: int(x.id));
+
+    def get_records_by_label(self, label):
+        return filter(lambda r: r is not None, ( l.get_record(label) for l in self.__sorted_levels() ))
+
     def __str__(self):
         s = ""
-        for level in sorted(self.levels.values(), key=lambda x: int(x.id)):
+        for level in self.__sorted_levels():
             s += "\n" + str(level)
         return s
 
@@ -48,6 +54,12 @@ class Level:
             if self.name is not None:
                 raise ValueError("tried to add multiple name records to Level")
             self.name = record.value
+
+    def get_record(self, label):
+        for r in self.scores:
+            if r.label == label:
+                return r
+        return None
 
     def get_name(self):
         return self.name if self.name is not None else "???"
@@ -161,7 +173,6 @@ if __name__ == '__main__':
             record = ScoreRecord(raw)
             recordbuff = bytearray()
             scores.add_record(record)
-            print(record.detail_str())
         except ValueError:
             # Splitting on the supposed record start marker isn't quite right because there's nothing stopping it appearing in values
             # If we fail, ensure the end marker is present (though of course this suffers the same problem, albeit less frequently)
@@ -169,3 +180,7 @@ if __name__ == '__main__':
             printerr("Got truncated record, trying to extend the buffer...")
 
     print(scores)
+
+    # Display the details for all of the name records, to see if we can spot any patterns
+    for r in scores.get_records_by_label('name'):
+        print(r.detail_str())
