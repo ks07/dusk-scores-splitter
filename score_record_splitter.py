@@ -1,7 +1,22 @@
 #!/usr/bin/env python3
 
+import itertools
 import struct
 import sys
+
+def printerr(msg):
+    print(msg, file=sys.stderr)
+
+try:
+    from termcolor import colored
+except:
+    printerr("termcolor not found, output will not be coloured")
+    def colored(s, *args, **kwargs):
+        # *args and **kwargs are ignored, as these are just to give a compatible signature with termcolor.colored
+        return s
+
+# Possible colour names to use for detail output
+colours = ['red', 'green', 'cyan', 'magenta', 'blue']
 
 class Scores:
     def __init__(self):
@@ -44,9 +59,15 @@ class Level:
             s += "\n\t" + str(r)
         return s
 
+def format_bytes(bs):
+    return ' '.join(['{:02X}'.format(b) for b in bs])
+def format_decimals(bs):
+    return ' '.join([str(b) for b in bs])
+
 class ScoreRecord:
     def __init__(self, raw):
-        self.raw = raw
+        # Need to prepend the start marker that gets stripped by the split
+        self.raw = b'\x7e' + raw
         # { appears to be the record end marker
         stripped = raw.rstrip(b'{')
         if stripped == raw:
@@ -65,24 +86,62 @@ class ScoreRecord:
 
         # Numeric values appear to be at the end of records, strings are variable length.
         if self.label in ['seconds', 'minutes']:
+            self.val_type = 'float'
             self.value = struct.unpack('<f', self.rest[-4:])[0]
         elif self.label in ['name']:
+            self.val_type = 'string'
             # TODO: why do string values start at this position?
             lenValue = self.rest[9]
             self.value = self.rest[10:10+lenValue].decode("utf-8")
             if len(self.value) != lenValue:
                 printerr(f"String length value {lenvalue} does not match extracted string '{self.value}'")
         else:
+            self.val_type = 'int'
             self.value = int.from_bytes(self.rest[-4:], byteorder='little')
             if self.label == 'levelbeaten' and self.value != int(self.level):
                 printerr(f"levelbeaten value {self.value} does not match expected value of the level tag {self.level}");
 
+    def detail_str(self):
+        # [[readable, raw_len], ...] raw_len of -1 means calculate based on the readable value
+        parsed_start = [['^', 1], ['s:', 1], [self.level, -1], [self.label, -1]]
+        parsed_end   = []
+
+        if self.val_type in ['float','int']:
+            parsed_end.append([self.value, 4])
+        else:
+            parsed_end.extend([['s:', 1], [self.value, -1]])
+
+        parsed_end.append(['$', 1])
+
+        accounted_for = 0
+        for x in parsed_start + parsed_end:
+            if x[1] == -1:
+                x[1] = len(x[0].encode('utf-8'))
+            accounted_for += x[1]
+
+        if accounted_for < len(self.raw):
+            parsed_start.append(['?', len(self.raw) - accounted_for])
+
+        detail = parsed_start + parsed_end
+        output = [[],[],[]]
+        i = 0
+        for c, d in zip(itertools.cycle(colours), detail):
+            j = i + d[1]
+            raw_slice = self.raw[i:j]
+            i = j
+            out = [str(d[0]), format_bytes(raw_slice), format_decimals(raw_slice)]
+            max_len = max([len(s) for s in out])
+
+            output[0].append(colored(out[0].ljust(max_len), c))
+            output[1].append(colored(out[1].ljust(max_len), c))
+            output[2].append(colored(out[2].ljust(max_len), c))
+
+        return '\n'.join([' | '.join(l) for l in output]) + '\n'
+
+
     def __str__(self):
         return "[" + str(self.level) + "] " + self.label + ": " + str(self.value) + " " + str(self.rest)
         
-
-def printerr(msg):
-    print(msg, file=sys.stderr)
 
 def split_scores(path):
     with open(path, 'rb') as infile:
@@ -102,6 +161,7 @@ if __name__ == '__main__':
             record = ScoreRecord(raw)
             recordbuff = bytearray()
             scores.add_record(record)
+            print(record.detail_str())
         except ValueError:
             # Splitting on the supposed record start marker isn't quite right because there's nothing stopping it appearing in values
             # If we fail, ensure the end marker is present (though of course this suffers the same problem, albeit less frequently)
