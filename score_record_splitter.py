@@ -63,17 +63,19 @@ class ScoreRecord:
         self.label = identifier[i:]
         self.rest  = raw[1+identifierLen:]
 
-        # apparently the last 4 bytes are the business end???
+        # Numeric values appear to be at the end of records, strings are variable length.
         if self.label in ['seconds', 'minutes']:
             self.value = struct.unpack('<f', self.rest[-4:])[0]
         elif self.label in ['name']:
-            # 9th byte is potentially the string length... though not really necessary with the end record marker
-            self.lenValue = self.rest[9]
-            self.value = self.rest[10:10+self.lenValue].decode("utf-8")
-            if len(self.value) != self.lenValue:
-                printerr("Length indicator assumption turned out to not be true at all...")
+            # TODO: why do string values start at this position?
+            lenValue = self.rest[9]
+            self.value = self.rest[10:10+lenValue].decode("utf-8")
+            if len(self.value) != lenValue:
+                printerr(f"String length value {lenvalue} does not match extracted string '{self.value}'")
         else:
             self.value = int.from_bytes(self.rest[-4:], byteorder='little')
+            if self.label == 'levelbeaten' and self.value != int(self.level):
+                printerr(f"levelbeaten value {self.value} does not match expected value of the level tag {self.level}");
 
     def __str__(self):
         return "[" + str(self.level) + "] " + self.label + ": " + str(self.value) + " " + str(self.rest)
