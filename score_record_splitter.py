@@ -135,7 +135,8 @@ class ScoreRecord:
             parsed_start.append(['?', len(self.raw) - accounted_for])
 
         detail = parsed_start + parsed_end
-        output = [[],[],[]]
+        output_labels = ['parsed', 'hex', 'dec'];
+        output        = [[],       [],    []];
         i = 0
         for c, d in zip(itertools.cycle(colours), detail):
             j = i + d[1]
@@ -148,7 +149,10 @@ class ScoreRecord:
             output[1].append(colored(out[1].ljust(max_len), c))
             output[2].append(colored(out[2].ljust(max_len), c))
 
-        return '\n'.join([' | '.join(l) for l in output]) + '\n'
+        max_len = max([len(s) for s in output_labels]) + 1
+        output_labels = [l.ljust(max_len, '-') + '> ' for l in output_labels]
+
+        return '\n'.join([lab + ' | '.join(line) for lab, line in zip(output_labels, output)]) + '\n'
 
 
     def __str__(self):
