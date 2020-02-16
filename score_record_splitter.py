@@ -162,6 +162,7 @@ def split_scores(path):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
+        printerr(f"Usage: {sys.argv[0]} <path_to_scores>");
         sys.exit(1)
     records = split_scores(sys.argv[1])
     recordbuff = bytearray()
