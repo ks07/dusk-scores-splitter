@@ -31,6 +31,9 @@ class Scores:
     def __sorted_levels(self):
         return sorted(self.levels.values(), key=lambda x: int(x.id));
 
+    def get_level(self, level):
+        return self.levels[level]
+
     def get_records_by_label(self, label):
         return filter(lambda r: r is not None, ( l.get_record(label) for l in self.__sorted_levels() ))
 
@@ -188,4 +191,8 @@ if __name__ == '__main__':
 
     # Display the details for all of the name records, to see if we can spot any patterns
     for r in scores.get_records_by_label('name'):
+        print(r.detail_str())
+
+    l = scores.get_level('3')
+    for r in l.scores:
         print(r.detail_str())
