@@ -20,19 +20,22 @@ colours = ['red', 'green', 'cyan', 'magenta', 'blue']
 
 class Scores:
     def __init__(self):
-        self.levels = {}
+        self.__levels = {}
 
     def add_record(self, record):
-        if record.level in self.levels:
-            self.levels[record.level].add_record(record)
+        if record.level in self.__levels:
+            self.__levels[record.level].add_record(record)
         else:
-            self.levels[record.level] = Level(record)
+            self.__levels[record.level] = Level(record)
 
     def __sorted_levels(self):
-        return sorted(self.levels.values(), key=lambda x: int(x.id));
+        return sorted(self.__levels.values(), key=lambda x: int(x.id));
+
+    def get_levels(self):
+        return self.__sorted_levels();
 
     def get_level(self, level):
-        return self.levels[level]
+        return self.__levels[level]
 
     def get_records_by_label(self, label):
         return filter(lambda r: r is not None, ( l.get_record(label) for l in self.__sorted_levels() ))
@@ -57,6 +60,9 @@ class Level:
             if self.name is not None:
                 raise ValueError("tried to add multiple name records to Level")
             self.name = record.value
+
+    def get_records(self):
+        return self.scores
 
     def get_record(self, label):
         for r in self.scores:
@@ -116,7 +122,7 @@ class ScoreRecord:
             if self.label == 'levelbeaten' and self.value != int(self.level):
                 printerr(f"levelbeaten value {self.value} does not match expected value of the level tag {self.level}");
 
-    def detail_str(self):
+    def detail_breakdown(self):
         # [[readable, raw_len], ...] raw_len of -1 means calculate based on the readable value
         parsed_start = [['^', 1], ['s:', 1], [self.level, -1], [self.label, -1]]
         parsed_end   = []
@@ -124,7 +130,8 @@ class ScoreRecord:
         if self.val_type in ['float','int']:
             parsed_end.append([self.value, 4])
         else:
-            parsed_end.extend([['s:', 1], [self.value, -1]])
+            detail_display = f"s[{len(self.value)}]{{{self.value}}}"
+            parsed_end.append([detail_display, len(self.value.encode('utf-8')) + 1])
 
         parsed_end.append(['$', 1])
 
@@ -138,29 +145,60 @@ class ScoreRecord:
             parsed_start.append(['?', len(self.raw) - accounted_for])
 
         detail = parsed_start + parsed_end
+        widths        = []
         output_labels = ['parsed', 'hex', 'dec'];
         output        = [[],       [],    []];
+        cols = []
         i = 0
-        for c, d in zip(itertools.cycle(colours), detail):
+        for c_i, d in enumerate(detail):
             j = i + d[1]
             raw_slice = self.raw[i:j]
             i = j
-            out = [str(d[0]), format_bytes(raw_slice), format_decimals(raw_slice)]
-            max_len = max([len(s) for s in out])
 
-            output[0].append(colored(out[0].ljust(max_len), c))
-            output[1].append(colored(out[1].ljust(max_len), c))
-            output[2].append(colored(out[2].ljust(max_len), c))
+            if len(cols) == c_i:
+                cols.append([])
 
-        max_len = max([len(s) for s in output_labels]) + 1
-        output_labels = [l.ljust(max_len, '-') + '> ' for l in output_labels]
+            cols[c_i].extend([str(d[0]), format_bytes(raw_slice), format_decimals(raw_slice)])
 
-        return '\n'.join([lab + ' | '.join(line) for lab, line in zip(output_labels, output)]) + '\n'
+        return cols
 
 
     def __str__(self):
         return "[" + str(self.level) + "] " + self.label + ": " + str(self.value) + " " + str(self.rest)
         
+def print_detail(batched_cols):
+    '''Takes an iterable of ScoreRecord.detail_breakdown() outputs, and pretty prints them to stdout.'''
+    output_labels = ['parsed', 'hex', 'dec']
+    max_len = max([len(l) for l in output_labels])
+    output_labels = [l.ljust(max_len, '-') + '> ' for l in output_labels]
+
+    lines = []
+    max_cols = max([len(l) for l in batched_cols])
+    widths = [0] * max_cols
+    for cols in batched_cols:
+        lines.append([])
+        batch_lines = []
+        for c_i, col in enumerate(cols):
+            widths[c_i] = max([widths[c_i]] + [len(s) for s in col])
+            for l_i, v in enumerate(col):
+                if len(batch_lines) == l_i:
+                    batch_lines.append([])
+                batch_lines[l_i].append(v)
+        lines.extend(batch_lines) # TODO: should this be append instead, and then we don't need the empty array append above?
+
+    label_i = 0
+    for l in lines:
+        if len(l) == 0:
+            # Batch separator
+            print('\n')
+            label_i = 0
+            continue
+        if label_i < len(output_labels):
+            print(output_labels[label_i], end='')
+            label_i += 1
+        for w, c, v in zip(widths, itertools.cycle(colours), l):
+            print(colored(v.ljust(w), c), end='|')
+        print('')
 
 def split_scores(path):
     with open(path, 'rb') as infile:
@@ -187,12 +225,5 @@ if __name__ == '__main__':
             recordbuff.extend(raw)
             printerr("Got truncated record, trying to extend the buffer...")
 
-    print(scores)
-
-    # Display the details for all of the name records, to see if we can spot any patterns
-    for r in scores.get_records_by_label('name'):
-        print(r.detail_str())
-
-    l = scores.get_level('3')
-    for r in l.scores:
-        print(r.detail_str())
+    batched_cols = [r.detail_breakdown() for l in scores.get_levels() for r in l.get_records()]
+    print_detail(batched_cols)
