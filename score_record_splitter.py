@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from collections import defaultdict
+from functools import partial
 import itertools
 import struct
 import sys
@@ -122,6 +124,8 @@ class ScoreRecord:
             if self.label == 'levelbeaten' and self.value != int(self.level):
                 printerr(f"levelbeaten value {self.value} does not match expected value of the level tag {self.level}");
 
+        self.mid_chunk = bytes(self.rest[0:9])
+
     def detail_breakdown(self):
         # [[readable, raw_len], ...] raw_len of -1 means calculate based on the readable value
         parsed_start = [['^', 1], ['s:', 1], [self.level, -1], [self.label, -1]]
@@ -227,3 +231,20 @@ if __name__ == '__main__':
 
     batched_cols = [r.detail_breakdown() for l in scores.get_levels() for r in l.get_records()]
     print_detail(batched_cols)
+
+    print('\n----- middle chunk breakdown -----\n')
+
+    # Bin records by the mysterious middle chunk
+    chunk_buckets = defaultdict(partial(defaultdict, int))
+    rec_count = 0
+    for l in scores.get_levels():
+        for r in l.get_records():
+            rec_count += 1
+            mid = r.mid_chunk
+            lab = r.label
+            chunk_buckets[mid][lab] += 1
+            chunk_buckets[mid]['__total__'] += 1
+    print(f"Processed {rec_count} records:")
+    for mid, labels in sorted(chunk_buckets.items(), key=lambda vals: vals[1]['__total__']):
+        tot = labels.pop('__total__')
+        print(f"{mid}: {tot} [{','.join(labels.keys())}]")
