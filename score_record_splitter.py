@@ -235,15 +235,12 @@ if __name__ == '__main__':
     print('\n----- middle chunk breakdown -----\n')
 
     # Bin records by the first mystery byte
-    chunk_buckets = defaultdict(partial(defaultdict, int))
+    chunk_buckets = {}
     rec_count = 0
     for r in scores.get_records_by_label('name'):
         rec_count += 1
         mid = r.mid_chunk[0]
-        chunk_buckets[mid][r.value] += 1
-        chunk_buckets[mid]['__total__'] += 1
+        chunk_buckets[mid] = len(r.value)
     print(f"Processed {rec_count} records:")
-    for mid, labels in sorted(chunk_buckets.items(), key=lambda vals: vals[1]['__total__']):
-        tot = labels.pop('__total__')
-        length_labels = [ f'{label} ({len(label)})' for label in labels.keys() ]
-        print(f"{mid}: {tot} [{' ; '.join(length_labels)}]")
+    for mid, length in sorted(chunk_buckets.items(), key=lambda vals: vals[1]):
+        print(f"{mid}: {length} {mid - length}")
