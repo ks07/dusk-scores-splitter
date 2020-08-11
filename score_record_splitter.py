@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+"""Parses and helps explains Dusk scores files.
+
+Please see https://cucurbit.dev/posts/dusk-an-investigation-into-soap/ for an explanation.
+"""
+
 from collections import defaultdict
 from functools import partial
 import itertools
@@ -21,6 +26,7 @@ except:
 colours = ['red', 'green', 'cyan', 'magenta', 'blue']
 
 class Scores:
+    """Top level scores data structure, stores Level objects."""
     def __init__(self):
         self.__levels = {}
 
@@ -31,10 +37,10 @@ class Scores:
             self.__levels[record.level] = Level(record)
 
     def __sorted_levels(self):
-        return sorted(self.__levels.values(), key=lambda x: int(x.id));
+        return sorted(self.__levels.values(), key=lambda x: int(x.id))
 
     def get_levels(self):
-        return self.__sorted_levels();
+        return self.__sorted_levels()
 
     def get_level(self, level):
         return self.__levels[level]
@@ -49,6 +55,7 @@ class Scores:
         return s
 
 class Level:
+    """Stores all of the ScoreRecord instances for a given game level."""
     def __init__(self, record):
         self.id     = record.level
         self.scores = [ record ]
@@ -88,6 +95,7 @@ def format_decimals(bs):
     return ' '.join([str(b) for b in bs])
 
 class ScoreRecord:
+    """Represents an individual records in the scores file. The constructor expects a raw bytes instance of a single record, which will be parsed."""
     def __init__(self, raw):
         # Need to prepend the start marker that gets stripped by the split
         self.raw = b'\x7e' + raw
@@ -122,7 +130,7 @@ class ScoreRecord:
             self.val_type = 'int'
             self.value = int.from_bytes(self.rest[-4:], byteorder='little')
             if self.label == 'levelbeaten' and self.value != int(self.level):
-                printerr(f"levelbeaten value {self.value} does not match expected value of the level tag {self.level}");
+                printerr(f"levelbeaten value {self.value} does not match expected value of the level tag {self.level}")
 
         self.mid_chunk = bytes(self.rest[0:9])
 
@@ -149,9 +157,6 @@ class ScoreRecord:
             parsed_start.append(['?', len(self.raw) - accounted_for])
 
         detail = parsed_start + parsed_end
-        widths        = []
-        output_labels = ['parsed', 'hex', 'dec'];
-        output        = [[],       [],    []];
         cols = []
         i = 0
         for c_i, d in enumerate(detail):
@@ -169,7 +174,7 @@ class ScoreRecord:
 
     def __str__(self):
         return "[" + str(self.level) + "] " + self.label + ": " + str(self.value) + " " + str(self.rest)
-        
+
 def print_detail(batched_cols):
     '''Takes an iterable of ScoreRecord.detail_breakdown() outputs, and pretty prints them to stdout.'''
     output_labels = ['parsed', 'hex', 'dec']
@@ -211,7 +216,7 @@ def split_scores(path):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        printerr(f"Usage: {sys.argv[0]} <path_to_scores>");
+        printerr(f"Usage: {sys.argv[0]} <path_to_scores>")
         sys.exit(1)
     records = split_scores(sys.argv[1])
     recordbuff = bytearray()
